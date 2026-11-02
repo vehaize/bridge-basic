@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: lint, test, build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # Full history of this ref, so a secret removed before the tip is still scanned.
+          # Other branches are fetched too. The scan below does not walk them.
+          fetch-depth: 0
+
+      - name: Scan for secrets
+        # gitleaks-action asks organization accounts for a license secret.
+        # This job uses the CLI instead, pinned by version and checksum.
+        # It needs no token beyond the checkout credential.
+        run: |
+          set -euo pipefail
+          version="8.30.1"
+          tarball="gitleaks_${version}_linux_x64.tar.gz"
+          url="https://github.com/gitleaks/gitleaks/releases/download/v${version}/${tarball}"
+          expected="551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+          curl -fsSL -o "${tarball}" "${url}"
+          echo "${expected}  ${tarball}" | sha256sum -c -
+          tar -xzf "${tarball}" gitleaks
+          # Limit git log to HEAD. The default walk includes every fetched ref,
+          # and that includes open pull requests that are not part of this branch.
+          ./gitleaks detect --source . --redact --no-banner --exit-code 1 --log-opts="--full-history --diff-filter=tuxdb HEAD"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ">=22.13.0 <23"
+          cache: npm
+
+      - name: Check documented defaults
+        # Plain Node. No install. Fails when a deadline default in the docs
+        # disagrees with src/provisional.ts, or when docs/llms.txt forks llms.txt.
+        run: node scripts/doc-drift.mjs
+
+      - name: Check funding metadata
+        # Plain Node. No install. Fails when a tracked file contains a funding
+        # URL, or the appeal substring the script rejects. package-lock.json
+        # is included. npm writes that field on install; postinstall removes it.
+        run: node scripts/lockfile-funding.mjs --check
+
+      - name: Check released migrations
+        # Runs before npm ci. Does not apply SQL or call Cloudflare.
+        # Fetch the PR base: a full checkout of the head omits a base tip that moved ahead.
+        env:
+          MIGRATION_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          MIGRATION_BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          if [ -n "${MIGRATION_BASE_REF}" ]; then
+            case "${MIGRATION_BASE_REF}" in
+              *[!A-Za-z0-9._/-]*)
+                echo "migration base is unresolved" >&2
+                exit 1
+                ;;
+            esac
+            git fetch --no-tags origin "+refs/heads/${MIGRATION_BASE_REF}:refs/remotes/origin/${MIGRATION_BASE_REF}"
+          fi
+          node scripts/migration-guard.mjs --base "${MIGRATION_BASE}"
+
+      - name: Test secret scan history
+        run: node --experimental-strip-types --disable-warning=ExperimentalWarning --test test/secret-scan-history.test.ts
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Test pinned OAuth provider
+        run: npm run test:provider
+
+      - name: Build
+        run: npm run build

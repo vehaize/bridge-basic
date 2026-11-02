@@ -1,0 +1,12 @@
+# Local `wrangler dev` only. Copy this file to `.dev.vars` (gitignored) if you
+# run the Worker locally. Production does not read this file.
+#
+# Set production secrets with `wrangler secret put <NAME> --config wrangler.jsonc`.
+# Wrangler reads the value from the prompt or from stdin. Do not pass it as an
+# argument, and do not write a real value into this file or into git.
+#
+# Names only. The Worker on main reads these two secret names and no others.
+# OWNER_EMAIL and BRIDGE_ORIGIN are vars in wrangler.jsonc, not secrets.
+
+BOOTSTRAP_SECRET=
+WAKE_SECRET_GROK_BOT=

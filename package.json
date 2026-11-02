@@ -1,0 +1,37 @@
+{
+  "name": "admrn-bridge",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Single-tenant bridge between Grok Bot, Dot (ChatGPT), and Claude (claude.ai), self-hosted on your Cloudflare account.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "engines": {
+    "node": "^22.13.0 || >=24"
+  },
+  "scripts": {
+    "postinstall": "node scripts/lockfile-funding.mjs",
+    "types": "wrangler types -c wrangler.example.jsonc worker-configuration.d.ts",
+    "prelint": "npm run types",
+    "prebuild": "npm run types",
+    "lint": "eslint . && tsc --noEmit",
+    "grok-credential": "node scripts/grok-credential.mjs",
+    "connect-code": "node scripts/connect-code.mjs",
+    "test": "node --experimental-strip-types --disable-warning=ExperimentalWarning --import ./test/cloudflare-workers-hook.mjs --test test/health.test.ts test/owner-claim.test.ts test/item-lifecycle.test.ts test/authority-envelope.test.ts test/mcp-adapter.test.ts test/grok-bearer.test.ts test/dot-oauth.test.ts test/dot-connect.test.ts test/oauth-endpoints.test.ts test/mcp-route.test.ts test/grok-credential.test.ts test/connect-code.test.ts test/test-instance.test.ts test/dco-signoff.test.ts test/rate-limit.test.ts test/wake.test.ts test/retention.test.ts test/migration-guard.test.ts test/live-switch.test.ts test/migration-0006.test.ts test/migration-0007.test.ts test/claude-basic.test.ts test/invariants.test.ts test/wrangler-docs.test.ts test/doc-drift.test.ts test/lockfile-funding.test.ts",
+    "test:provider": "node scripts/oauth-provider-artifact.mjs && node --test test/oauth-provider-artifact.test.mjs test/oauth-provider-probe.test.mjs test/dot-connect.integration.test.mjs",
+    "build": "tsc -p tsconfig.build.json"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vehaize/bridge-basic.git"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "eslint": "^10.13.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.71.2",
+    "wrangler": "^4.151.1"
+  },
+  "dependencies": {
+    "@cloudflare/workers-oauth-provider": "1.2.3"
+  }
+}

@@ -1,0 +1,30 @@
+node_modules/
+dist/
+coverage/
+
+# Regenerated from wrangler.example.jsonc by `npm run types`.
+worker-configuration.d.ts
+
+# Local secrets and Wrangler state
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+.env
+.env.*
+.wrangler/
+
+# Real Wrangler configs carry account, D1, and KV identifiers.
+# The tracked file is the placeholder template only.
+wrangler.toml
+wrangler.json
+wrangler.jsonc
+wrangler.*.toml
+wrangler.*.json
+wrangler.*.jsonc
+!wrangler.example.jsonc
+
+# Receipts and logs
+receipts/
+logs/
+*.log
+*.receipt

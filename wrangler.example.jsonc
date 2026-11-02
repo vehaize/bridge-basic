@@ -1,0 +1,167 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  // Basic: Grok Bot, Dot, and Claude. Dot/Claude share these OAuth bindings;
+  // they have separate participant-bound codes and grants. No engineering lane.
+  "name": "admrn-bridge",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-18",
+  // enable_request_signal aborts request.signal when the client disconnects.
+  // Without it, Connect disconnect cleanup does not run. The 10-second claim
+  // lease still releases the code for the next submit.
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public", "enable_request_signal"],
+  "upload_source_maps": true,
+  // Copy this file to wrangler.jsonc (gitignored) and replace every placeholder
+  // before using Wrangler. Do not commit account IDs, resource IDs, or the owner email.
+  // Placeholders in this file:
+  //   <YOUR_ACCOUNT_ID>
+  //   <YOUR_DOMAIN>                         public hostname in BRIDGE_ORIGIN
+  //   <OWNER_EMAIL>                         top-level var, and again inside the commented env.test block
+  //   <YOUR_D1_DATABASE_ID>
+  //   <YOUR_KV_NAMESPACE_ID>                binding KV. The Worker does not read it. Keep the binding.
+  //   <YOUR_OAUTH_KV_NAMESPACE_ID>          binding OAUTH_KV. Dot grants. Required for /authorize and /token.
+  //   "1001"                                UNAUTHENTICATED_RATE_LIMIT namespace_id
+  //   "1002"                                AUTHENTICATED_RATE_LIMIT namespace_id
+  //   <YOUR_TEST_D1_DATABASE_ID>            commented env.test only. Leave that block commented for production.
+  //   <YOUR_TEST_KV_NAMESPACE_ID>           commented env.test only.
+  //   <YOUR_TEST_OAUTH_KV_NAMESPACE_ID>     commented env.test only.
+  // A rate-limit namespace_id is a string containing a positive integer unique
+  // to the account, for example "1001", not a descriptive name. KV namespace
+  // ids are hex ids Cloudflare issues. Wrangler does not create a rate-limit
+  // namespace id. A missing or rejected
+  // UNAUTHENTICATED_RATE_LIMIT or AUTHENTICATED_RATE_LIMIT binding makes a
+  // charged request return 503 with error rate_limit_unavailable.
+  // Worker secrets are not in this file. Local names are in .dev.vars.example.
+  // Production steps are docs/install.md. The commented env.test block is not
+  // a second Worker. See docs/test-instance.md.
+  "account_id": "<YOUR_ACCOUNT_ID>",
+  // Default hostname: admrn-bridge.<account-subdomain>.workers.dev.
+  // Wrangler infers workers_dev false when route or routes is set, so true is
+  // explicit. Preview URLs stay off.
+  // https://developers.cloudflare.com/workers/wrangler/configuration/
+  "workers_dev": true,
+  "preview_urls": false,
+  // RETENTION_CRON in src/provisional.ts. One daily purge. Workers Free allows five crons per account.
+  "triggers": { "crons": ["0 0 * * *"] },
+  // Optional custom domain. Leave this commented on the workers.dev path.
+  // Uncommenting routes makes Wrangler infer workers_dev false unless the key
+  // above stays true. Zone WAF rate limiting needs this zone. See docs/install.md.
+  // "routes": [
+  //   {
+  //     // Hostname only, for example "bridge.example.com". Custom Domains do not use a path suffix.
+  //     "pattern": "<YOUR_DOMAIN>",
+  //     "custom_domain": true
+  //   }
+  // ],
+  // Non-secret operator setting. The first successful owner claim locks this value.
+  // POST /owner/claim reads it. See docs/design/owner-lock.md.
+  // LIVE_ENABLED is intentionally absent. Only an unset value or the exact
+  // string "true" allows writes. Every other value is off (fail closed).
+  // Add it only in the private wrangler.jsonc. See
+  // docs/implementation/live-switch.md. GET /health, OAuth discovery,
+  // GET /authorize, refresh-token grants, the read tools, and the daily
+  // retention cron stay available.
+  "vars": {
+    "OWNER_EMAIL": "<OWNER_EMAIL>",
+    // Public https origin with no path. The default hostname is
+    // admrn-bridge.<account-subdomain>.workers.dev. A custom domain is optional.
+    // OAuth metadata and token audience use this value. Requests on any other
+    // origin are refused. See docs/design/message-path.md question 10.
+    "BRIDGE_ORIGIN": "https://<YOUR_DOMAIN>"
+  },
+  // Holds the owner-lock record. Apply migrations/ with
+  // `wrangler d1 migrations apply DB --remote` before the first claim.
+  // Do not apply these files with `wrangler d1 execute --file`. See docs/install.md.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "admrn-bridge",
+      "database_id": "<YOUR_D1_DATABASE_ID>"
+    }
+  ],
+  // Placeholder binding required by the Phase 0 template. The Worker does not read it.
+  "kv_namespaces": [
+    {
+      "binding": "KV",
+      "id": "<YOUR_KV_NAMESPACE_ID>"
+    },
+    {
+      // Hashed Dot OAuth grants and tokens. D1 remains the authority on whether
+      // Dot may act. migrations/0004_connect_code.sql has to be recorded in
+      // d1_migrations before connecting Dot. See docs/install.md.
+      "binding": "OAUTH_KV",
+      "id": "<YOUR_OAUTH_KV_NAMESPACE_ID>"
+    }
+  ],
+  // Workers Rate Limiting. Free on Workers, no per-call charge. The numbers are
+  // UNAUTHENTICATED_RATE_LIMIT, AUTHENTICATED_RATE_LIMIT, and
+  // RATE_LIMIT_PERIOD_SECONDS in src/provisional.ts. namespace_id is a string
+  // containing a positive integer unique to the account (for example "1001"),
+  // not a descriptive name. A KV namespace id is a hex id Cloudflare issues.
+  // There is no create command for a rate-limit namespace id. /token, /owner/claim, /mcp, and a
+  // POST /authorize that passes the OAuth prefilter and the consent site
+  // check each have their own address bucket. A cross-site or same-site form
+  // POST is not counted. GET /authorize does not spend that bucket. A missing or
+  // rejected binding makes a charged request return 503 with
+  // {"ok":false,"error":"rate_limit_unavailable"}. A method, path, or
+  // content type the route rejects is not counted. /health and the OAuth
+  // discovery routes do not use these bindings. The private test file must
+  // keep both bindings. See docs/install.md and docs/test-instance.md.
+  "ratelimits": [
+    {
+      "name": "UNAUTHENTICATED_RATE_LIMIT",
+      "namespace_id": "1001",
+      "simple": { "limit": 60, "period": 60 }
+    },
+    {
+      "name": "AUTHENTICATED_RATE_LIMIT",
+      "namespace_id": "1002",
+      "simple": { "limit": 120, "period": 60 }
+    }
+  ],
+  "observability": {
+    "enabled": true,
+    "redact_query_string": true,
+    "logs": {
+      "enabled": true,
+      // Invocation logs capture request headers, such as Bootstrap-Secret.
+      "invocation_logs": false,
+      "head_sampling_rate": 1
+    },
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 0.01
+    }
+  }
+  // Optional test instance. Leave this commented. Copy wrangler.example.jsonc
+  // to a gitignored wrangler.test.jsonc and change that copy's top-level name,
+  // origin, D1, and KV ids. Do not uncomment this inside the production
+  // file: a deploy without --env would still publish the top-level Worker.
+  // See docs/test-instance.md. bridge-test.example.invalid is the anonymized
+  // optional custom domain. The default test hostname is workers.dev.
+  // The real hostname goes only in the private file. Commands read
+  // BRIDGE_ORIGIN from that file. Creating the DNS record and the route is a
+  // live step only when that optional custom domain is used. Keep global_fetch_strictly_public.
+  // "env": {
+  //   "test": {
+  //     "name": "admrn-bridge-test",
+  //     "routes": [
+  //       { "pattern": "bridge-test.example.invalid", "custom_domain": true }
+  //     ],
+  //     "vars": {
+  //       "OWNER_EMAIL": "<OWNER_EMAIL>",
+  //       "BRIDGE_ORIGIN": "https://bridge-test.example.invalid"
+  //     },
+  //     "d1_databases": [
+  //       {
+  //         "binding": "DB",
+  //         "database_name": "admrn-bridge-test",
+  //         "database_id": "<YOUR_TEST_D1_DATABASE_ID>"
+  //       }
+  //     ],
+  //     "kv_namespaces": [
+  //       { "binding": "KV", "id": "<YOUR_TEST_KV_NAMESPACE_ID>" },
+  //       { "binding": "OAUTH_KV", "id": "<YOUR_TEST_OAUTH_KV_NAMESPACE_ID>" }
+  //     ]
+  //   }
+  // }
+}

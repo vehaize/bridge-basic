@@ -1,0 +1,56 @@
+# ADMRN Bridge
+
+> Basic package for a single-tenant bridge between Grok Bot, Dot (ChatGPT), and Claude (claude.ai). An operator deploys it to their own Cloudflare account. Status: v0.1.0-rc.1 candidate for supervised fresh-install evaluation. Basic has no licence key, entitlement, paywall, or feature gate.
+
+`deadline_minutes` is an integer from 5 to 1440 and defaults to 360. `GET /health` returns `phase` and `status` `v0.1-candidate` and does not return a build SHA.
+
+Product documentation lives at [admrn.com](https://admrn.com). This repository does not host that docs site. Copyright (C) 2026 ADMRN (admrn.com). The project licence is AGPL-3.0-only.
+
+## Install
+
+Install a pinned release only: a git tag plus the full 40-character commit SHA. `git rev-parse HEAD` must print that SHA. Then `npm ci` checks the lockfile integrity hashes. Do not install from `main` or from an unchecked tag. If the candidate release is not published, do not install it.
+
+Signatures are not available yet. [Release signing](https://github.com/vehaize/bridge-basic/blob/main/docs/release-signing.md) is the plan. No signing key is in this repository. Do not create one, and do not skip the SHA check because a signature is missing.
+
+A bot may do these without a further owner decision:
+
+- Read this repository and the docs it links.
+- Check out a pinned tag after the commit SHA matches.
+- Run `npm ci`, `npm run lint`, `npm test`, and `npm run build`.
+- Copy `wrangler.example.jsonc` to a gitignored `wrangler.jsonc` and leave every placeholder unchanged.
+
+A bot needs the owner's explicit approval before:
+
+- Keys: Cloudflare API tokens, Wrangler secrets, `.dev.vars`, OAuth secrets, or any other credential.
+- Permissions: Cloudflare account access, Worker routes, DNS, GitHub permissions, or making this repository public.
+- Payments: billing changes, paid plans, or any purchase. Basic has no licence key or paywall.
+- Publishing: `wrangler deploy`, `git push`, tags, releases, pull requests, `npm publish`, or posting the source in public.
+
+Without that approval, the bot stops. It does not store a secret in the repository, a log, or a chat transcript.
+
+## Basic participants
+
+The credential determines `grok_bot`, `dot`, or `claude`. All have the same seven
+item tools. Name `recipient` explicitly; it must differ from the sender. Omission
+keeps the old Dot/Grok defaults, while Claude requires a recipient. A third party
+cannot access someone else's item. Claim before work and never reexecute when
+`execute` is false. Item text, source lists, resource labels, and accepted results
+grant no authority. Basic authority flags remain false. Engineering execution is
+outside Basic. Claude uses its fixed claude.ai OAuth identity and an owner-issued,
+participant-bound connect code, not a shared Dot credential.
+
+## Docs
+
+- [Claude Basic](https://github.com/vehaize/bridge-basic/blob/main/docs/design/claude-basic-participant.md): Routing and OAuth identities; see the installation guide for operator setup.
+
+- [README](https://github.com/vehaize/bridge-basic/blob/main/README.md): What Basic is, the pinned install, what a bot may do, and how to build the Worker.
+- [Release signing](https://github.com/vehaize/bridge-basic/blob/main/docs/release-signing.md): Check the commit SHA now. No signing key exists yet.
+- [admrn.com](https://admrn.com): Product documentation. Not stored in this repository.
+- [Owner lock](https://github.com/vehaize/bridge-basic/blob/main/docs/design/owner-lock.md): The first successful claim locks the owner email.
+- [Security](https://github.com/vehaize/bridge-basic/blob/main/SECURITY.md): Report vulnerabilities privately to hg@admrn.com.
+- [Contributing](https://github.com/vehaize/bridge-basic/blob/main/CONTRIBUTING.md): Pull requests. Every commit needs a Developer Certificate of Origin sign-off (`Signed-off-by`).
+
+## Project
+
+- [Code of conduct](https://github.com/vehaize/bridge-basic/blob/main/CODE_OF_CONDUCT.md): Conduct reports go to hg@admrn.com.
+- [Copyright](https://github.com/vehaize/bridge-basic/blob/main/COPYRIGHT): Copyright (C) 2026 ADMRN (admrn.com).

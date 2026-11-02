@@ -1,0 +1,27 @@
+# Default rules stay in force. Each allowlist needs the generic-api-key rule,
+# one path, and one value shape. A commit-wide or directory-wide ignore is not used.
+title = "admrn-bridge"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "SHA-256 digests of released migration files in the freeze guard."
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''(?:^|/)scripts/migration-guard\.mjs$''']
+regexes = ['''(?i)^[a-f0-9]{64}$''']
+
+[[allowlists]]
+description = "Synthetic idempotency key in the invariants fixture."
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''(?:^|/)test/invariants\.test\.ts$''']
+regexes = ['''^req_inv_[a-z0-9]{4,16}$''']
+
+[[allowlists]]
+description = "Synthetic idempotency key in the Claude Basic documentation example."
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''(?:^|/)docs/implementation/claude-basic\.md$''']
+regexes = ['''^req_claude_question_001$''']
