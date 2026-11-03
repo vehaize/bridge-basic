@@ -72,7 +72,15 @@ jobs:
             esac
             git fetch --no-tags origin "+refs/heads/${MIGRATION_BASE_REF}:refs/remotes/origin/${MIGRATION_BASE_REF}"
           fi
-          node scripts/migration-guard.mjs --base "${MIGRATION_BASE}"
+          base="${MIGRATION_BASE}"
+          # A push that creates the branch reports an all-zeros "before". Only a
+          # single root commit has nothing released before it: compare it with
+          # itself, so the pin check still runs. Any other zero base stays unresolved.
+          if [ "${GITHUB_EVENT_NAME}" = "push" ] && [ "${base}" = "0000000000000000000000000000000000000000" ] \
+            && [ "$(git rev-list --count HEAD)" = "1" ]; then
+            base="${GITHUB_SHA}"
+          fi
+          node scripts/migration-guard.mjs --base "${base}"
 
       - name: Test secret scan history
         run: node --experimental-strip-types --disable-warning=ExperimentalWarning --test test/secret-scan-history.test.ts
